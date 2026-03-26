@@ -27,12 +27,13 @@ async function startMonitor(acc) {
         port: 993, 
         tls: true, 
         authTimeout: 15000,
-        debug: console.log // This shows the raw talk between server and Gmail
+        // THIS IS THE FIX FOR SELF-SIGNED CERTIFICATE ERROR
+        tlsOptions: { rejectUnauthorized: false } 
       }
     });
 
     await connection.openBox('INBOX');
-    console.log(`✅ SUCCESS: ${acc.user} is now monitoring.`);
+    console.log(`✅ SUCCESS: ${acc.user} connected!`);
 
     connection.on('mail', async () => {
       const messages = await connection.search(['UNSEEN'], { bodies: [''], markSeen: true });
@@ -40,29 +41,22 @@ async function startMonitor(acc) {
         const part = item.parts.find(p => p.which === '');
         const mail = await simpleParser(part.body);
         
-        const { error } = await supabase.from('delivery_logs').insert([{
+        await supabase.from('delivery_logs').insert([{
           target_email: acc.user,
           sender: mail.from?.value[0]?.address || "Unknown",
           subject: mail.subject || "No Subject",
           spf_status: (mail.headers.get('received-spf') || '').includes('pass') ? 'PASS' : 'FAIL',
           dkim_status: mail.headers.get('dkim-signature') ? 'PASS' : 'FAIL'
         }]);
-
-        if (error) console.error(`❌ Supabase Error: ${error.message}`);
-        else console.log(`🚀 Logged mail for ${acc.user}`);
+        console.log(`🚀 New mail pushed for ${acc.user}`);
       }
     });
 
   } catch (e) { 
-    console.log(`--- DEBUG FOR ${acc.user} ---`);
-    if (e.message.includes('AUTHENTICATIONFAILED')) {
-      console.log(`❌ ERROR: Wrong App Password or 2-Step disabled.`);
-    } else if (e.message.includes('ETIMEDOUT')) {
-      console.log(`❌ ERROR: Network timeout. Gmail is busy.`);
-    } else {
-      console.log(`❌ ERROR: ${e.message}`);
-    }
-    setTimeout(() => startMonitor(acc), 20000); 
+    console.log(`--- ERROR FOR ${acc.user} ---`);
+    console.log(e.message);
+    // Restart on error
+    setTimeout(() => startMonitor(acc), 30000); 
   }
 }
 
