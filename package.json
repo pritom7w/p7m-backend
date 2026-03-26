@@ -1,11 +1,17 @@
 {
   "name": "p7m-backend",
-  "version": "2.0.0",
+  "version": "1.0.0",
+  "description": "P7M Omni Backend",
   "main": "index.js",
-  "scripts": { "start": "node index.js" },
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
     "imap-simple": "^5.1.0",
-    "mailparser": "^3.6.5",
-    "@supabase/supabase-client": "^2.39.0"
+    "mailparser": "^3.6.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
