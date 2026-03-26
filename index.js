@@ -1,13 +1,9 @@
 const imaps = require('imap-simple');
 const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-client');
-const http = require('http');
 
-// CONNECTION TO YOUR SUPABASE
+// Connect to your Supabase
 const supabase = createClient('https://udcxtupppnuhprocloyi.supabase.co', 'sb_publishable_AYjH9uTSTo026yHni97KGA_srQVH-hX');
-
-// KEEP-ALIVE SERVER (For UptimeRobot)
-http.createServer((req, res) => { res.writeHead(200); res.end("P7M_ACTIVE"); }).listen(process.env.PORT || 3000);
 
 const accounts = [
   { user: "Suvo.mondalx@gmail.com", pass: "ndpuablwkxolugoe" },
@@ -25,10 +21,10 @@ const accounts = [
 async function startMonitor(acc) {
   try {
     const connection = await imaps.connect({
-      imap: { user: acc.user, password: acc.pass, host: 'imap.gmail.com', port: 993, tls: true, authTimeout: 10000 }
+      imap: { user: acc.user, password: acc.pass, host: 'imap.gmail.com', port: 993, tls: true }
     });
     await connection.openBox('INBOX');
-    console.log(`CONNECTED: ${acc.user}`);
+    console.log(`Watching: ${acc.user}`);
 
     connection.on('mail', async () => {
       const messages = await connection.search(['UNSEEN'], { bodies: [''], markSeen: true });
@@ -36,19 +32,17 @@ async function startMonitor(acc) {
         const part = item.parts.find(p => p.which === '');
         const mail = await simpleParser(part.body);
         
+        // Save to Supabase instantly
         await supabase.from('delivery_logs').insert([{
           target_email: acc.user,
-          sender: mail.from?.value[0]?.address || "Unknown",
-          subject: mail.subject || "No Subject",
+          sender: mail.from.value[0].address,
+          subject: mail.subject,
           spf_status: mail.headers.get('received-spf')?.includes('pass') ? 'PASS' : 'FAIL',
-          dkim_status: mail.headers.get('dkim-signature') ? 'PASS' : 'FAIL',
-          priority: mail.headers.get('x-priority') || 'NORMAL'
+          dkim_status: mail.headers.get('dkim-signature') ? 'PASS' : 'FAIL'
         }]);
       }
     });
-
-    connection.on('error', () => setTimeout(() => startMonitor(acc), 5000));
-  } catch (e) { setTimeout(() => startMonitor(acc), 10000); }
+  } catch (e) { setTimeout(() => startMonitor(acc), 5000); }
 }
 
 accounts.forEach(startMonitor);
