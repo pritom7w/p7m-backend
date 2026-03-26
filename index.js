@@ -1,13 +1,8 @@
 const imaps = require('imap-simple');
 const { simpleParser } = require('mailparser');
-const { createClient } = require('@supabase/supabase-client');
-const http = require('http');
+const { createClient } = require('@supabase/supabase-js');
 
-// CONNECTION TO YOUR SUPABASE
 const supabase = createClient('https://udcxtupppnuhprocloyi.supabase.co', 'sb_publishable_AYjH9uTSTo026yHni97KGA_srQVH-hX');
-
-// KEEP-ALIVE SERVER (For UptimeRobot)
-http.createServer((req, res) => { res.writeHead(200); res.end("P7M_ACTIVE"); }).listen(process.env.PORT || 3000);
 
 const accounts = [
   { user: "Suvo.mondalx@gmail.com", pass: "ndpuablwkxolugoe" },
@@ -25,10 +20,10 @@ const accounts = [
 async function startMonitor(acc) {
   try {
     const connection = await imaps.connect({
-      imap: { user: acc.user, password: acc.pass, host: 'imap.gmail.com', port: 993, tls: true, authTimeout: 10000 }
+      imap: { user: acc.user, password: acc.pass, host: 'imap.gmail.com', port: 993, tls: true, authTimeout: 15000 }
     });
     await connection.openBox('INBOX');
-    console.log(`CONNECTED: ${acc.user}`);
+    console.log(`✅ ACTIVE: ${acc.user}`);
 
     connection.on('mail', async () => {
       const messages = await connection.search(['UNSEEN'], { bodies: [''], markSeen: true });
@@ -41,14 +36,19 @@ async function startMonitor(acc) {
           sender: mail.from?.value[0]?.address || "Unknown",
           subject: mail.subject || "No Subject",
           spf_status: mail.headers.get('received-spf')?.includes('pass') ? 'PASS' : 'FAIL',
-          dkim_status: mail.headers.get('dkim-signature') ? 'PASS' : 'FAIL',
-          priority: mail.headers.get('x-priority') || 'NORMAL'
+          dkim_status: mail.headers.get('dkim-signature') ? 'PASS' : 'FAIL'
         }]);
       }
     });
 
-    connection.on('error', () => setTimeout(() => startMonitor(acc), 5000));
-  } catch (e) { setTimeout(() => startMonitor(acc), 10000); }
+    connection.on('error', (err) => {
+      console.log(`❌ Connection Error for ${acc.user}: ${err.message}`);
+      setTimeout(() => startMonitor(acc), 5000);
+    });
+  } catch (e) { 
+    console.log(`⚠️ Failed to connect ${acc.user}, retrying...`);
+    setTimeout(() => startMonitor(acc), 10000); 
+  }
 }
 
 accounts.forEach(startMonitor);
